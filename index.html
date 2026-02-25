@@ -2,36 +2,57 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cascada SPA | Sistema Operativo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Configuración de colores oficiales para usarlos como clases de Tailwind
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'cascada-oro': '#C5A059',
+                        'cascada-azul': '#1B2945',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         .text-dense { font-size: 10px; }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Mejora visual para los botones de sedes que se generarán */
+        .sede-card { border-left: 4px solid #C5A059; transition: all 0.3s; }
+        .sede-card:active { transform: scale(0.98); background-color: #f8f5f0; }
     </style>
     <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
-<body class="bg-slate-50 text-slate-800 antialiased font-sans">
+<body class="bg-cascada-azul text-slate-800 antialiased font-sans">
 
     <div id="app" class="max-w-md mx-auto min-h-screen flex flex-col shadow-2xl bg-white">
-        <header class="p-5 bg-white border-b flex justify-between items-center sticky top-0 z-10">
-            <h1 class="font-black text-teal-800 tracking-tighter text-2xl italic">CASCADA SPA</h1>
-            <div id="status-online" class="w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
-        </header>
+<header class="p-6 bg-white border-b flex flex-col items-center sticky top-0 z-10 shadow-sm">
+    <div class="absolute right-5 top-8">
+        <div id="status-online" class="w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+    </div>
+
+    <img src="titulo.png" 
+         alt="CASCADA SPA" 
+         style="height: 110px; width: auto; object-fit: contain; display: block;"
+         class="fade-in">
+</header>
 
         <main id="main-content" class="p-6 flex-grow">
             <div class="mb-8">
-                <h2 class="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Seleccionar Sede</h2>
-                <div class="h-1 w-12 bg-teal-500 rounded-full"></div>
+                <h2 class="text-sm font-bold text-cascada-azul uppercase tracking-[0.2em] mb-1">Seleccionar Sede</h2>
+                <div class="h-1 w-12 bg-cascada-oro rounded-full"></div>
             </div>
 
             <div id="lista-sedes" class="grid grid-cols-1 gap-4">
                 <div id="loading-state" class="flex flex-col items-center justify-center py-20 text-slate-400">
-                    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-teal-600 mb-4"></div>
+                    <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-cascada-oro mb-4"></div>
                     <p class="text-xs font-medium tracking-widest uppercase">Sincronizando...</p>
                 </div>
             </div>
