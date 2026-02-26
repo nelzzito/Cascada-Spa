@@ -80,5 +80,49 @@
             });
         }
     </script>
+    <script>
+  // Bloquea el menú contextual para que no puedan inspeccionar el código
+  document.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Bloquea gestos de "atrás/adelante" en móviles que a veces sacan al usuario de la app
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) e.preventDefault();
+  }, {passive: false});
+</script>
+
+<div id="modal-sesiones" style="display:none;" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl">
+        <h3 id="modal-titulo" class="text-[11px] font-black uppercase text-slate-800 mb-4 italic text-center">Ajustar Sesiones</h3>
+        
+        <input type="number" id="input-num-sesiones" 
+               oninput="if(this.value.length > 2) this.value = this.value.slice(0,2)"
+               class="w-full border-2 border-slate-100 rounded-xl p-4 text-center text-2xl font-black text-teal-600 focus:border-teal-500 outline-none mb-4"
+               placeholder="00">
+        
+        <div class="flex gap-2">
+            <button onclick="document.getElementById('modal-sesiones').style.display='none'" 
+                    class="flex-1 py-3 text-[10px] font-black uppercase bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancelar</button>
+            <button id="btn-confirmar-sesiones" 
+                    class="flex-1 py-3 text-[10px] font-black uppercase bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-filtro-excel" style="display:none;" class="fixed inset-0 bg-black/20 z-[10000] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-[280px] overflow-hidden border border-slate-200">
+        <div class="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+            <span id="titulo-filtro" class="text-[10px] font-black uppercase text-slate-600 italic">Seleccionar Pacientes</span>
+            <button onclick="document.getElementById('modal-filtro-excel').style.display='none'" class="text-slate-400 hover:text-red-500">✕</button>
+        </div>
+        
+        <div id="lista-opciones-filtro" class="max-height-[300px] overflow-y-auto p-2 flex flex-col gap-1 bg-white">
+            </div>
+
+        <div class="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
+            <button onclick="window.aplicarFiltroExcel()" class="flex-1 bg-teal-600 text-white text-[10px] font-black uppercase py-2 rounded-lg hover:bg-teal-700 transition-all">Aplicar Filtro</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

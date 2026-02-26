@@ -165,13 +165,18 @@ window.mostrarSeccionPromociones = async function(idSedeRecibida, nombreSedeReci
         main.innerHTML = `<p class="text-center text-red-500 font-bold italic uppercase text-xs">Error de conexión.</p>`;
     }
 };
+
+
 window.renderizarCitasAdmin = async function(filtroSede = 'TODAS') {
+    // 1. Localizamos el contenedor inicial
     const cont = document.getElementById('contenedor-admin');
+    if (!cont) return console.error("No se encontró el elemento contenedor-admin en el HTML");
+
     const panelPadre = cont.parentElement; 
     const esTodas = filtroSede === 'TODAS';
 
     const { data: citas, error } = await sb.from('citas')
-        .select('*, clientes(nombre, telefono, identificacion), sedes(nombre)')
+        .select('*, clientes(nombre, telefono, identificacion, citas_restantes, sesiones_totales), sedes(nombre)')
         .order('fecha_hora', { ascending: true });
         
     if (error) {
@@ -191,39 +196,46 @@ window.renderizarCitasAdmin = async function(filtroSede = 'TODAS') {
         : "grid grid-cols-3 gap-2 px-6 py-4 bg-slate-50 border-b border-slate-100";
     
     nuevoHeader.innerHTML = `
-        ${esTodas ? '<span class="text-[10px] font-black text-slate-400 uppercase italic">Sede</span>' : ''}
-        <span class="text-[10px] font-black text-slate-400 uppercase italic text-center">Fecha / Hora</span>
-        <span class="text-[10px] font-black text-slate-400 uppercase italic">Paciente</span>
-        <span class="text-[10px] font-black text-slate-400 uppercase italic text-right">Acción</span>
-    `;
+    ${esTodas ? `
+        <div class="flex items-center gap-1 cursor-pointer group" onclick="window.alternarFiltroAdmin('sede')">
+            <span class="text-[10px] font-black text-slate-500 uppercase italic">Sede</span>
+            <span class="text-[8px] text-slate-400 group-hover:text-teal-600">▼</span>
+        </div>` : ''}
+    <div class="flex items-center justify-center gap-1 cursor-pointer group" onclick="window.alternarFiltroAdmin('fecha')">
+        <span class="text-[10px] font-black text-slate-500 uppercase italic">Fecha / Hora</span>
+        <span class="text-[8px] text-slate-400 group-hover:text-teal-600">▼</span>
+    </div>
+    <div class="flex items-center gap-1 cursor-pointer group" onclick="window.alternarFiltroAdmin('paciente')">
+        <span class="text-[10px] font-black text-slate-500 uppercase italic">Paciente</span>
+        <span class="text-[8px] text-slate-400 group-hover:text-teal-600">▼</span>
+    </div>
+    <div class="flex items-center justify-end gap-1 cursor-pointer group" onclick="window.alternarFiltroAdmin('estado')">
+        <span class="text-[10px] font-black text-slate-500 uppercase italic">Acción</span>
+        <span class="text-[8px] text-slate-400 group-hover:text-teal-600">▼</span>
+    </div>
+`;
     panelPadre.insertBefore(nuevoHeader, cont);
 
     // 2. RENDERIZAR FILAS
     cont.innerHTML = ''; 
+    // MANTENEMOS EL ID ORIGINAL PARA QUE EL FILTRO NO SE PIERDA
+    cont.id = 'contenedor-admin'; 
 
     if (filtradas.length === 0) {
         cont.innerHTML = `<div class="p-10 text-center uppercase text-[10px] font-bold text-slate-400 italic">Sin registros</div>`;
         return;
     }
 
-    // --- CORRECCIÓN DE FECHA (Lógica de Hoy) ---
-    const hoyCeroHoras = new Date();
-    hoyCeroHoras.setHours(0, 0, 0, 0); // Solo nos importa el día, no la hora
+    // --- Lógica de renderizado de cada fila ---
+    const ahora = new Date();
     
     filtradas.forEach(c => {
         const f = new Date(c.fecha_hora);
-        const fechaCitaCeroHoras = new Date(c.fecha_hora);
-        fechaCitaCeroHoras.setHours(0, 0, 0, 0);
+        let estadoFinal = (c.estado || 'ACTIVO').toUpperCase();
 
-       const ahora = new Date();
-const fechaCitaReal = new Date(c.fecha_hora); // Usamos la fecha exacta con hora
-
-let estadoFinal = (c.estado || 'ACTIVO').toUpperCase();
-
-// Si la cita está ACTIVA pero la hora ya pasó hoy, se marca como FINALIZADO
-if (estadoFinal === 'ACTIVO' && fechaCitaReal < ahora) {
-    estadoFinal = 'FINALIZADO';
-}
+        if (estadoFinal === 'ACTIVO' && f < ahora) {
+            estadoFinal = 'FINALIZADO';
+        }
 
         let accionHtml = "";
         if (estadoFinal === "FINALIZADO") {
@@ -231,7 +243,6 @@ if (estadoFinal === 'ACTIVO' && fechaCitaReal < ahora) {
         } else if (estadoFinal === "CANCELADO") {
             accionHtml = `<span style="color: #ef4444;" class="font-black text-[10px] uppercase italic tracking-tighter">✕ CANCELADO</span>`;
         } else {
-            // Botón corregido: enviamos el ID y la fecha para validar la regla de 1 hora después
             accionHtml = `
                 <button onclick="window.cambiarEstadoCita('${c.id}', '${c.fecha_hora}')" 
                     style="background-color: #facc15; color: #713f12; border: none;"
@@ -247,33 +258,180 @@ if (estadoFinal === 'ACTIVO' && fechaCitaReal < ahora) {
             ? "grid grid-cols-4 gap-2 px-6 py-4 items-center hover:bg-slate-50 border-b border-slate-50"
             : "grid grid-cols-3 gap-2 px-6 py-4 items-center hover:bg-slate-50 border-b border-slate-50";
 
-// Dentro de window.renderizarCitasAdmin, en el filtradas.forEach:
-div.innerHTML = `
-    ${esTodas ? `<div class="text-[10px] font-black text-teal-600 uppercase italic tracking-widest ex-sede">${sedeCorto}</div>` : `<span class="hidden ex-sede">${filtroSede}</span>`}
-    <div class="text-[11px] font-bold text-slate-700 text-center">
-        <span class="ex-fecha">${f.toLocaleDateString()}</span> <br>
-        <span class="text-slate-400 italic text-[10px] ex-hora">${f.getUTCHours().toString().padStart(2, '0')}:00</span>
-    </div>
-    <div class="flex flex-col">
-        <span class="font-black text-[11px] uppercase text-slate-800 tracking-tight leading-none ex-paciente">${c.clientes?.nombre || 'N/A'}</span>
-        <span class="text-[9px] text-slate-400 font-medium">${c.clientes?.identificacion || ''}</span>
-    </div>
-    <div class="text-right">
-        ${accionHtml}
-    </div>
-    <span class="hidden ex-id">${c.clientes?.identificacion || '---'}</span>
-    <span class="hidden ex-tel">${c.clientes?.telefono || '---'}</span>
-    <span class="hidden ex-est">${estadoFinal}</span>
-`;
+        div.innerHTML = `
+            ${esTodas ? `<div class="text-[10px] font-black text-teal-600 uppercase italic tracking-widest ex-sede">${sedeCorto}</div>` : `<span class="hidden ex-sede">${filtroSede}</span>`}
+            <div class="text-[11px] font-bold text-slate-700 text-center">
+                <span class="ex-fecha">${f.toLocaleDateString()}</span> <br>
+                <span class="text-slate-400 italic text-[10px] ex-hora">${f.getUTCHours().toString().padStart(2, '0')}:00</span>
+            </div>
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                    <span class="font-black text-[11px] uppercase text-slate-800 tracking-tight leading-none ex-paciente">
+                        ${c.clientes?.nombre || 'N/A'}
+                    </span>
+                    ${estadoFinal === 'ACTIVO' ? `
+                        <button onclick="window.cargarSesionesAdmin('${c.cliente_id}', '${c.clientes?.nombre}')" 
+                                class="bg-slate-100 p-1 rounded hover:bg-teal-100 transition-colors shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
+                <span class="text-teal-600 text-[9px] font-bold uppercase italic">[Saldo: ${c.clientes?.citas_restantes || 0}]</span>
+                <span class="text-[9px] text-slate-400 font-medium">${c.clientes?.identificacion || ''}</span>
+            </div>
+            <div class="text-right">
+                ${accionHtml}
+            </div>
+            <span class="hidden ex-id">${c.clientes?.identificacion || '---'}</span>
+            <span class="hidden ex-tel">${c.clientes?.telefono || '---'}</span>
+            <span class="hidden ex-est">${estadoFinal}</span>
+        `;
         cont.appendChild(div);
     });
 };
+
+window.alternarFiltroAdmin = function(tipo) {
+    const modal = document.getElementById('modal-filtro-excel');
+    const lista = document.getElementById('lista-opciones-filtro');
+    const contenedor = document.getElementById('contenedor-admin');
+
+    if (!contenedor || !modal) return;
+
+    lista.innerHTML = '';
+    let opcionesUnicas = new Set();
+
+    // 1. Lógica según la columna seleccionada
+    if (tipo === 'paciente') {
+        const etiquetas = contenedor.querySelectorAll('.ex-paciente');
+        etiquetas.forEach(el => opcionesUnicas.add(el.innerText.trim()));
+    } 
+    else if (tipo === 'estado') {
+        const etiquetas = contenedor.querySelectorAll('.ex-est');
+        etiquetas.forEach(el => opcionesUnicas.add(el.innerText.trim()));
+    }
+    else if (tipo === 'fecha') {
+        // Extraemos las fechas usando la clase que definiste: ex-fecha
+        const etiquetas = contenedor.querySelectorAll('.ex-fecha');
+        etiquetas.forEach(el => {
+            const fecha = el.innerText.trim();
+            if (fecha) opcionesUnicas.add(fecha);
+        });
+    }
+
+    // Ordenamos las opciones (en fechas, el orden alfabético simple suele servir para DD/MM)
+    const opcionesOrdenadas = Array.from(opcionesUnicas).sort();
+
+    // 2. Construir el Modal
+    let html = `
+        <div class="sticky top-0 bg-white border-b p-2 mb-1">
+            <label class="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" id="chk-todos-excel" checked class="w-4 h-4 accent-teal-600" 
+                       onchange="document.querySelectorAll('.chk-filtro-generico').forEach(c => c.checked = this.checked)">
+                <span class="text-[10px] font-black uppercase italic text-slate-600">(SELECCIONAR TODO)</span>
+            </label>
+        </div>
+    `;
+
+    opcionesOrdenadas.forEach(opt => {
+        html += `
+            <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer">
+                <input type="checkbox" class="chk-filtro-generico w-4 h-4 accent-teal-600" value="${opt}" data-tipo="${tipo}" checked>
+                <span class="text-[11px] font-bold text-slate-700 uppercase">${opt}</span>
+            </label>
+        `;
+    });
+
+    lista.innerHTML = html;
+    modal.style.display = 'flex';
+};
+
+
+window.aplicarFiltroExcel = function() {
+    const checks = document.querySelectorAll('.chk-filtro-generico:checked');
+    const seleccionados = Array.from(checks).map(cb => cb.value);
+    
+    const primerCheck = document.querySelector('.chk-filtro-generico');
+    if (!primerCheck) {
+        document.getElementById('modal-filtro-excel').style.display = 'none';
+        return;
+    }
+    const tipoFiltro = primerCheck.getAttribute('data-tipo');
+
+    const contenedor = document.getElementById('contenedor-admin');
+    if (!contenedor) return;
+
+    const filas = contenedor.querySelectorAll('.grid');
+
+    filas.forEach(fila => {
+        // Mapeo de selectores según el tipo de filtro
+        let selector = '.ex-paciente'; // por defecto
+        if (tipoFiltro === 'estado') selector = '.ex-est';
+        if (tipoFiltro === 'fecha') selector = '.ex-fecha';
+
+        const elValor = fila.querySelector(selector);
+        
+        if (elValor) {
+            const valorFila = elValor.innerText.trim();
+            
+            if (seleccionados.includes(valorFila)) {
+                fila.style.setProperty('display', 'grid', 'important');
+            } else {
+                fila.style.setProperty('display', 'none', 'important');
+            }
+        }
+    });
+
+    document.getElementById('modal-filtro-excel').style.display = 'none';
+};
+
+
 
 // SOLUCIÓN PARA EL ADMINISTRADOR
 window.cambiarEstadoCita = async function(id, fechaHora) {
     // Llamamos a la función maestra. 
     // Pasamos null en clienteId y saldo porque el admin no los necesita para refrescar su tabla.
     await window.cancelarCita(id, fechaHora, null, null);
+};
+
+// --- FUNCIÓN PARA QUE EL ADMIN CARGUE SESIONES DESPUÉS DE LA EVALUACIÓN ---
+window.cargarSesionesAdmin = function(clienteId, nombre) {
+    const modal = document.getElementById('modal-sesiones');
+    const input = document.getElementById('input-num-sesiones');
+    const btn = document.getElementById('btn-confirmar-sesiones');
+    const titulo = document.getElementById('modal-titulo');
+
+    titulo.innerText = `SESIONES PARA: ${nombre}`;
+    input.value = "12"; // Valor por defecto
+    modal.style.display = 'flex';
+    input.focus();
+
+    // Al hacer clic en confirmar
+    btn.onclick = async () => {
+        const num = parseInt(input.value);
+        if (isNaN(num) || num < 1 || input.value.length > 2) {
+            alert("Ingrese un número válido de 1 o 2 dígitos");
+            return;
+        }
+
+        modal.style.display = 'none';
+
+        try {
+            const { count } = await sb.from('citas').select('*', { count: 'exact', head: true }).eq('cliente_id', clienteId);
+            const saldoNuevo = num - (count || 0);
+
+            await sb.from('clientes').update({ 
+                sesiones_totales: num,
+                citas_restantes: saldoNuevo 
+            }).eq('id', clienteId);
+
+            alert("✅ Plan actualizado");
+            window.renderizarCitasAdmin();
+        } catch (err) {
+            alert("Error: " + err.message);
+        }
+    };
 };
 
 window.exportarExcel = function() {
@@ -604,91 +762,100 @@ window.eliminarPromocion = async function(id) {
                         <input type="tel" id="reg-telefono" maxlength="10" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Ej: 0998877665" 
                             class="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-500 italic font-bold text-xs shadow-sm">
                     </div>
+
+              <div>
+    <label class="text-[9px] text-teal-600 font-black uppercase italic ml-1"></label>
+    <input type="hidden" id="reg-sesiones" min="1" max="99" value="${servicio.citas_incluidas}" 
+        oninput="if(this.value.length > 2) this.value = this.value.slice(0,2)"
+        class="w-full p-2.5 rounded-xl border border-slate-200 outline-none focus:border-teal-500 italic font-bold text-xs shadow-sm">
+</div>
+
                     
-                    <button onclick="window.procesarRegistro('${servicio.id}', '${sedeId}', ${servicio.citas_incluidas}, '${servicio.nombre}', '${nombreSede}')" 
-                        id="btn-registro" class="w-full bg-teal-600 text-white p-3.5 rounded-xl font-black italic uppercase shadow-md active:scale-95 transition-all text-sm mt-2">
-                        REGISTRAR Y AGENDAR
-                    </button>
+               <button onclick="window.procesarRegistro('${servicio.id}', '${sedeId}', '${servicio.nombre}', '${nombreSede}')" 
+        id="btn-registro" 
+        class="w-full mt-6 bg-teal-600 hover:bg-teal-700 text-white font-black uppercase italic text-[12px] py-4 rounded-xl shadow-lg shadow-teal-900/20 active:scale-95 transition-all duration-200 tracking-widest">
+    REGISTRAR Y AGENDAR
+</button>
                 </div>
             </div>`;
     }
     
+
 // 6. PROCESAMIENTO REGISTRO (SOLUCIÓN DEFINITIVA AL BLOQUEO)
-    window.procesarRegistro = async function(servicioId, sedeId, sesiones, nombrePlan, nombreSede) {
-        const nombreInput = document.getElementById('reg-nombre')?.value.trim();
-        const cedula = document.getElementById('reg-cedula')?.value.trim();
-        const telf = document.getElementById('reg-telefono')?.value.trim();
-        const btn = document.getElementById('btn-registro');
-        const regexNombre = /^[a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+$/;
+    window.procesarRegistro = async function(servicioId, sedeId, nombrePlan, nombreSede) {
+    // CAPTURA DINÁMICA: Leemos el valor del input que creamos en el paso anterior
+    const sesionesInput = document.getElementById('reg-sesiones');
+    const numSesiones = sesionesInput ? (parseInt(sesionesInput.value) || 1) : 1;
 
-        // 1. VALIDACIONES PREVIAS
-        if(!nombreInput || !cedula || !telf) return alert("⚠️ Por favor complete todos los campos.");
-        if(!regexNombre.test(nombreInput)) return alert("⚠️ El nombre solo debe contener letras.");
-        if(cedula.length !== 10) return alert("⚠️ La cédula debe tener 10 dígitos.");
-        
-        // Control Celular: Exactamente 10 dígitos y empieza con 09
-        if(telf.length !== 10 || !telf.startsWith('09')) {
-            return alert("⚠️ El celular debe tener 10 dígitos y empezar con '09'.");
-        }
+    const nombreInput = document.getElementById('reg-nombre')?.value.trim();
+    const cedula = document.getElementById('reg-cedula')?.value.trim();
+    const telf = document.getElementById('reg-telefono')?.value.trim();
+    const btn = document.getElementById('btn-registro');
+    const regexNombre = /^[a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+$/;
 
-        try {
-            // 2. CAMBIO DE ESTADO VISUAL
-            btn.disabled = true;
-            btn.innerText = "PROCESANDO...";
+    // 1. VALIDACIONES PREVIAS
+    if(!nombreInput || !cedula || !telf) return alert("⚠️ Por favor complete todos los campos.");
+    if(!regexNombre.test(nombreInput)) return alert("⚠️ El nombre solo debe contener letras.");
+    if(cedula.length !== 10) return alert("⚠️ La cédula debe tener 10 dígitos.");
+    
+    if(telf.length !== 10 || !telf.startsWith('09')) {
+        return alert("⚠️ El celular debe tener 10 dígitos y empezar con '09'.");
+    }
 
-            // 3. INSERCIÓN EN BASE DE DATOS
-            const { data: nuevoCliente, error } = await sb.from('clientes').insert([{
-                nombre: nombreInput, 
-                identificacion: cedula, 
-                telefono: telf,
-                sede_id: sedeId, 
-                citas_restantes: sesiones, 
-                tratamiento_actual: nombrePlan
-            }]).select().single();
+    try {
+        btn.disabled = true;
+        btn.innerText = "PROCESANDO...";
 
-            // 4. MANEJO DE ERRORES DE SUPABASE
-            if (error) {
-                btn.disabled = false;
-                btn.innerText = "REGISTRAR Y AGENDAR CITA";
-                
-                if (error.code === '23505') {
-                    return alert("📍 Esta cédula ya está registrada. Por favor use la opción 'SEGUIMIENTO'.");
-                } else {
-                    return alert("❌ Error de conexión: " + error.message);
-                }
-            }
+        // 3. INSERCIÓN EN BASE DE DATOS
+        // Usamos numSesiones para sesiones_totales y para citas_restantes
+        const { data: nuevoCliente, error } = await sb.from('clientes').insert([{
+            nombre: nombreInput, 
+            identificacion: cedula, 
+            telefono: telf,
+            sede_id: sedeId, 
+            sesiones_totales: numSesiones, // El nuevo campo
+            citas_restantes: numSesiones,  // Dinámico
+            tratamiento_actual: nombrePlan
+        }]).select().single();
 
-            // 5. ÉXITO Y PASO AL CALENDARIO
-          // 5. ÉXITO Y PASO AL CALENDARIO
-            if (nuevoCliente) {
-                const modulo = document.getElementById('modulo-registro');
-                if (modulo) {
-                    // Aquí inyectamos el título instructivo y el espacio para el calendario
-                    modulo.innerHTML = `
-                        <div class="fade-in">
-                            <div class="bg-teal-600 p-3 rounded-2xl mb-4 shadow-md border-b-4 border-teal-800 text-center">
-                                <p class="text-white text-[10px] font-black uppercase italic leading-tight">
-                                    ¡REGISTRO EXITOSO!<br>
-                                    <span class="text-teal-100 text-[8px]">PASO FINAL: SELECCIONE FECHA Y HORA DE SU CITA</span>
-                                </p>
-                            </div>
-                            <div id="calendario-espacio"></div>
-                        </div>
-                    `;
-                }
-
-                // Llamamos a la agenda con los datos del nuevo cliente
-                window.abrirCalendario(nuevoCliente.id, sedeId, nuevoCliente.citas_restantes, nombreSede);
-            }
-
-        } catch (err) {
-            // Este bloque evita que la pantalla se quede pegada si algo falla catastróficamente
-            console.error("Error crítico:", err);
-            alert("⚠️ Ocurrió un error inesperado. Reintente en un momento.");
+        if (error) {
             btn.disabled = false;
-            btn.innerText = "REINTENTAR REGISTRO";
+            btn.innerText = "REGISTRAR Y AGENDAR CITA";
+            if (error.code === '23505') {
+                return alert("📍 Esta cédula ya está registrada. Por favor use la opción 'SEGUIMIENTO'.");
+            } else {
+                return alert("❌ Error de conexión: " + error.message);
+            }
         }
-    };
+
+        if (nuevoCliente) {
+            const modulo = document.getElementById('modulo-registro');
+            if (modulo) {
+                modulo.innerHTML = `
+                    <div class="fade-in">
+                        <div class="bg-teal-600 p-3 rounded-2xl mb-4 shadow-md border-b-4 border-teal-800 text-center">
+                            <p class="text-white text-[10px] font-black uppercase italic leading-tight">
+                                ¡REGISTRO EXITOSO!<br>
+                                <span class="text-teal-100 text-[8px]">PASO FINAL: SELECCIONE FECHA Y HORA DE SU CITA</span>
+                            </p>
+                        </div>
+                        <div id="calendario-espacio"></div>
+                    </div>
+                `;
+            }
+
+            // Pasamos numSesiones a la agenda para que el sistema sepa cuántas tiene ahora
+            window.abrirCalendario(nuevoCliente.id, sedeId, numSesiones, nombreSede);
+        }
+
+    } catch (err) {
+        console.error("Error crítico:", err);
+        alert("⚠️ Ocurrió un error inesperado. Reintente en un momento.");
+        btn.disabled = false;
+        btn.innerText = "REINTENTAR REGISTRO";
+    }
+};
+
 
     // 7. SEGUIMIENTO
     window.iniciarSeguimiento = function(sedeId, nombreSede) {
@@ -741,10 +908,12 @@ window.eliminarPromocion = async function(id) {
         return noEstaCancelada && fechaCita > ahora;
     }) : [];
 
-    // 3. CÁLCULO DE SALDO BASADO EN EL FILTRO
-    const totalBase = 14;
-    const numCitasAgendadas = citasValidas.length;
-    const saldoReal = totalBase - numCitasAgendadas;
+    
+  // 3. CÁLCULO DE SALDO BASADO EN EL FILTRO DINÁMICO
+// Usamos el campo de la BD, y si no existe (clientes antiguos), usamos 14 por defecto
+const totalBase = cliente.sesiones_totales || 14; 
+const numCitasAgendadas = citasValidas.length;
+const saldoReal = totalBase - numCitasAgendadas;
 
     // 4. RENDERIZADO
     contenedor.innerHTML = `
